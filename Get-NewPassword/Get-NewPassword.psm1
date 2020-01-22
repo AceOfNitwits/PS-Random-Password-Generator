@@ -24,6 +24,7 @@ Function New-Password{
     Specify the length and number of passwords you want to generate.
     Passwords can be automatically sent to pwpush.com and a unique link generated for each.
     Once the passwords are generated, you have the opportunity to copy the passwords and URLs to the clipboard.
+    By default passwords are shown with all but the first and last 30% of characters redacted. The displayed characters are there to help verify that you're pasting the correct password into another application.
 
     .PARAMETER Length
     Specifies the length of the generated passwords.
@@ -46,6 +47,20 @@ Function New-Password{
     .PARAMETER ExpireAfterViews
     If -Push is used, specifies the number of times the password can be viewed before the URL will no longer be valid.
 
+    .PARAMETER CharacterSet
+    Specify a character set to use for generating passwords. 
+    Choose from a list of predefined sets, or define your own as a string of characters.
+    Predefined Character Sets:
+    ==========================
+    no_derp           : Default. Designed to prevent Deliberate Entropy Reduced Passwords (DERP). Consists of all English alphanumeric characters and all US keyboard special characters except those hard to communicate or which may be easily misinterpreted: (~`^_|\"';/><,)
+    no_confusion      : Subset of no_derp with easily confused characters removed: (1lI0Oo)
+    alphanumeric      : All digits, all English uppercase and lowercase letters.
+    alphanumeric_caps : All digits, all English uppercase letters. (For case-insensitive systems)
+    numeric           : All digits. Useful for PINs.
+    no_derp+          : All US keyboard chracters, includng the space character. Not for the faint of heart. Warning: This can result in a password with a leading or trailing space.
+    Українські        : All Ukrainian Cyrilic keyboard characters. If you can't type this on your keyboard, don't use it. 😉
+    Русские           : All Russian Cyrilic keyboard characters. If you can't type this on your keyboard, don't use it. 😉
+
     .INPUTS
     This function does not accept pipeline input.
 
@@ -59,20 +74,29 @@ Function New-Password{
     [Parameter()][switch]$ShowPassword,
     [Parameter(ParameterSetName='push')][switch]$Push,
     [Parameter(ParameterSetName='push')][int]$ExpireAfterDays=10,
-    [Parameter(ParameterSetName='push')][int]$ExpireAfterViews=5
+    [Parameter(ParameterSetName='push')][int]$ExpireAfterViews=5,
+    [Parameter()][string]$CharacterSet='no_derp'
     )
 
     #Initialize list of characters.
-    [string[]]$ascii = $null
-    $ascii+="!"
-    For ($a=35;$a –le 38;$a++) {$ascii+=,[char][byte]$a } ##-&
-    For ($a=40;$a –le 43;$a++) {$ascii+=,[char][byte]$a } #(-+
-    For ($a=45;$a –le 46;$a++) {$ascii+=,[char][byte]$a } #--.
-    For ($a=48;$a –le 58;$a++) {$ascii+=,[char][byte]$a } #0-:
-    $ascii+="="
-    For ($a=63;$a –le 90;$a++) {$ascii+=,[char][byte]$a } #?-Z
-    For ($a=97;$a –le 122;$a++) {$ascii+=,[char][byte]$a } #a-z
-
+    $charsets = @{
+        'no_derp' = '!#$%&()*+-.0123456789:=?@ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+        'no_confusion' = '!#$%&()*+-.23456789:=?@ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz'
+        'alphanumeric' = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+        'alphanumeric_caps' = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        'numeric' = '0123456789'
+        'no_derp+' = ' ~`^_|\/"''!#$%&()*+-.,<>0123456789:;=?@ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+        'Українські' = '1234567890-=''!"№;%:?*()_+йцукенгшщзхї\ЙЦУКЕНГШЩЗХЇ/фівапролджєФІВАПРОЛДЖЄячсмитьбю.ЯЧСМИТЬБЮ,'
+        'Русские' = 'ё1234567890-=йцукенгшщзхъ\фывапролджэячсмитьбю.Ё!"№;%:?*()_+ЙЦУКЕНГШЩЗХЪ/ФЫВАПРОЛДЖЭЯЧСМИТЬБЮ,'
+    }
+    If(!$CharacterSet){$CharacterSet='no_derp'}
+    If($charsets.ContainsKey($CharacterSet)){
+        $myCharset = $charsets.$CharacterSet
+    }
+    Else{
+        $myCharset = $CharacterSet
+    }
+    [string[]]$ascii = $myCharset.ToCharArray()
     [string[]]$passwordList = $null
     $pwIndex = 0
     $pwArray = @()
