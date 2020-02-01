@@ -58,8 +58,12 @@ Function New-Password{
     alphanumeric_caps : All digits, all English uppercase letters. (For case-insensitive systems)
     numeric           : All digits. Useful for PINs.
     no_derp+          : All US keyboard chracters, includng the space character. Not for the faint of heart. Warning: This can result in a password with a leading or trailing space.
-    Українські        : All Ukrainian Cyrilic keyboard characters. If you can't type this on your keyboard, don't use it. 😉
-    Русские           : All Russian Cyrilic keyboard characters. If you can't type this on your keyboard, don't use it. 😉
+    Українські        : All Ukrainian Cyrilic keyboard characters. If you can't type this on your keyboard, you probably shouldn't use it.
+    Русские           : All Russian Cyrilic keyboard characters. If you can't type this on your keyboard, you probably shouldn't use it.
+
+    .PARAMETER PasswordOnly
+    Returns only a single password string and no prompts to copy; for use in automation.
+    Assumes password -Count = 1 and no -Push.
 
     .INPUTS
     This function does not accept pipeline input.
@@ -68,14 +72,31 @@ Function New-Password{
     https://pwpush.com
 
 #>
+    [CmdletBinding(DefaultParameterSetName='interactive')]
     Param(
-    [Parameter(Position=0)][int]$Length=15,
-    [Parameter(Position=1,HelpMessage='Number of passwords to generate')][int]$Count=1,
-    [Parameter()][switch]$ShowPassword,
-    [Parameter(ParameterSetName='push')][switch]$Push,
-    [Parameter(ParameterSetName='push')][int]$ExpireAfterDays=10,
-    [Parameter(ParameterSetName='push')][int]$ExpireAfterViews=5,
-    [Parameter()][string]$CharacterSet='no_derp'
+    [Parameter(Position=0)]
+    [int]$Length=15,
+    
+    [Parameter()]
+    [string]$CharacterSet='no_derp',
+
+    [Parameter(ParameterSetName='interactive',HelpMessage='Number of passwords to generate')]
+    [int]$Count=1,
+    
+    [Parameter(ParameterSetName='interactive')]
+    [switch]$ShowPassword,
+    
+    [Parameter(ParameterSetName='interactive')]
+    [switch]$Push,
+    
+    [Parameter(ParameterSetName='interactive')]
+    [int]$ExpireAfterDays=10,
+    
+    [Parameter(ParameterSetName='interactive')]
+    [int]$ExpireAfterViews=5,
+    
+    [Parameter(ParameterSetName='automation')]
+    [switch]$PasswordOnly
     )
 
     #Initialize list of characters.
@@ -130,35 +151,41 @@ Function New-Password{
 
         #$pwNumber++
     }
-    Switch ($ShowPassword){
-        $true {$pwArray | Select-Object Index, Password, Url | FT}
-        $false {$pwArray | Select-Object Index, RedactedPassword, Url | FT}
+    If($PasswordOnly){
+        Return $pwArray[0].Password
     }
-    If ($Push){
-        Write-Host "URLs will be valid for $ExpireAfterDays days or $ExpireAfterViews views, whichever occurs first." -ForegroundColor DarkYellow
-    }
-    $prompt = "Copy [P]assword $(If($Push){'or [U]rl '})to clipboard? (default: none)"
+    Else{
+        Switch ($ShowPassword){
+            # This is where the password array is returned.
+            $true {$pwArray | Select-Object Index, Password, Url | FT}
+            $false {$pwArray | Select-Object Index, RedactedPassword, Url | FT}
+        }
+        If ($Push){
+            Write-Host "URLs will be valid for $ExpireAfterDays days or $ExpireAfterViews views, whichever occurs first." -ForegroundColor DarkYellow
+        }
+        $prompt = "Copy [P]assword $(If($Push){'or [U]rl '})to clipboard? (default: none)"
 
-    Do{
-        If($pwArray.Count -eq 1){
-            $selectedIndex = 0
-        }
-        Else{
-            $selectedIndex = Read-Host Select an index number to copy, or press enter for none.
-        }
-        If([string]$selectedIndex -ne ''){
-            $selectedPassword = $pwArray[$selectedIndex].Password
-            $selectedUrl = $pwArray[$selectedIndex].Url
-            Do{
-                $copyResponse = Read-Host $prompt
-                Switch ($copyResponse){
-                    "P" {Set-Clipboard -Value $selectedPassword;Write-Host "Password copied to clipboard."}
-                    "U" {Set-Clipboard -Value $selectedUrl;Write-Host "URL copied to clipboard."}
-                }
-            } While ($copyResponse)
-        }
-        If($pwArray.Count -eq 1){break}
-    } While ($selectedIndex)
+        Do{
+            If($pwArray.Count -eq 1){
+                $selectedIndex = 0
+            }
+            Else{
+                $selectedIndex = Read-Host Select an index number to copy, or press enter for none.
+            }
+            If([string]$selectedIndex -ne ''){
+                $selectedPassword = $pwArray[$selectedIndex].Password
+                $selectedUrl = $pwArray[$selectedIndex].Url
+                Do{
+                    $copyResponse = Read-Host $prompt
+                    Switch ($copyResponse){
+                        "P" {Set-Clipboard -Value $selectedPassword;Write-Host "Password copied to clipboard."}
+                        "U" {Set-Clipboard -Value $selectedUrl;Write-Host "URL copied to clipboard."}
+                    }
+                } While ($copyResponse)
+            }
+            If($pwArray.Count -eq 1){break}
+        } While ($selectedIndex)
+    }
 }
 
 Export-ModuleMember -Function New-Password
